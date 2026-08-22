@@ -1,58 +1,86 @@
-name: Build and Push Docker Image
+name: Docker Build & Release
 
 on:
   push:
     branches:
       - main
-      - master
-    tags:
-      - 'v*.*.*'
-  pull_request:
-    branches:
-      - main
-      - master
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+permissions:
+  contents: write
 
 jobs:
-  build-and-push:
+  bump-and-build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Read and Bump Version
+        id: versioning
+        run: |
+          # Read current version from VERSION file (default to 1.0.0 if missing)
+          if [ -f VERSION ]; then
+            CURRENT_VERSION=$(cat VERSION | tr -d '\n\r ')
+          else
+            CURRENT_VERSION="1.0.0"
+          fi
+
+          echo "Current version: $CURRENT_VERSION"
+
+          # Split version into major, minor, patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          # Auto-bump patch version (change to MINOR or MAJOR if preferred)
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+
+          echo "New bumped version: $NEW_VERSION"
+
+          # Write new version back to VERSION file
+          echo "$NEW_VERSION" > VERSION
+
+          # Save to output for subsequent steps
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit and Tag Version Bump
+        run: |
+          VERSION="${{ steps.versioning.outputs.NEW_VERSION }}"
+          git add VERSION
+          git commit -m "chore(release): bump version to $VERSION [skip ci]"
+          git tag -a "v$VERSION" -m "Automated release v$VERSION"
+          git push origin main --tags
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
-        if: github.event_name != 'pull_request'
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
-            type=ref,event=tag
+            type=raw,value=latest
+            type=raw,value=${{ steps.versioning.outputs.NEW_VERSION }}
+            type=semver,pattern={{version}},value=${{ steps.versioning.outputs.NEW_VERSION }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

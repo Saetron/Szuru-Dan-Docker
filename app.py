@@ -6,6 +6,10 @@ from routes.favorites import favorites_bp
 from routes.users import users_bp
 from routes.proxy import proxy_bp
 from routes.admin import admin_bp
+from pathlib import Path
+
+VERSION_FILE = Path(__file__).parent / "VERSION"
+__version__ = VERSION_FILE.read_text().strip() if VERSION_FILE.exists() else "0.0.0"
 
 
 def create_app():
