@@ -1,6 +1,7 @@
 from flask import request
 from config import config
 
+
 def get_current_domain():
     """动态获取当前请求的域名"""
     if config.REVERSE_PROXY_MODE:
@@ -11,6 +12,7 @@ def get_current_domain():
     else:
         # 普通模式下使用配置的域名
         return config.DOMAIN_URL
+
 
 def build_resource_url(resource_path):
     """构建资源URL"""

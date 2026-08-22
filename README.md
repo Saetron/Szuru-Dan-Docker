@@ -3,7 +3,7 @@ A flask server that translate szuru api to danbooru style. (To let danbooru clie
 
 ## How to use
 1. Clone this repository
-   
+
     ```bash
     git clone https://github.com/MILES-FAN/Szuru-Dan.git
     ```
@@ -28,7 +28,7 @@ A flask server that translate szuru api to danbooru style. (To let danbooru clie
     # The port of the api translator
     port = 9000
 
-    # Enable reverse proxy mode 
+    # Enable reverse proxy mode
     # Function: Image url will be translated to the url of the reverse proxy server
     # (Warning: If you are deploying this api translator on a cloud server, watch out for the bandwidth)
     reverse_proxy_mode = false
