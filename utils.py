@@ -131,18 +131,6 @@ def dict_factory(cursor, row):
     return d
 
 
-def filtered_posts(posts: list, banned_tags: list) -> list:
-    """Method to filter posts by tags,
-    returns a list of filtered posts"""
-    filtered_posts = []
-    for post in posts:
-        tags = parse_tags(post["tags"])
-        if not filtered_post_by_tags(tags, banned_tags):
-            continue
-        filtered_posts.append(post)
-    return filtered_posts
-
-
 def filtered_posts(posts: list, banned_tags: list) -> tuple[list, list]:
     """Method to filter posts by tags,
     returns a tuple of two lists,

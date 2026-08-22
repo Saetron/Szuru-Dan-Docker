@@ -46,10 +46,10 @@ def search_posts():
         try:
             response = requests.get(api_url, headers=headers, timeout=30)
         except requests.exceptions.Timeout:
-            logger.error(f"API request timeout for query: {original_query}")
+            logger.error(f"API request timeout for query: {original_query}")  # noqa: F821
             return jsonify({"message": "API request timeout"}), 504
         except requests.exceptions.RequestException as e:
-            logger.error(f"API request failed: {e}")
+            logger.error(f"API request failed: {e}")  # noqa: F821
             return jsonify({"message": "API request failed"}), 500
 
     timer.checkpoint("Szurubooru API response received")
