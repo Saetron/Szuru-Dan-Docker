@@ -1,10 +1,11 @@
 import base64
+import binascii
 from flask import request
 from utils import encode_auth_headers
 
 
 def get_auth_headers():
-    """Extract authentication from request and return headers dict"""
+    """Extract authentication from request and return headers dict along with credentials"""
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     login, api_key = extract_auth_from_request()
 
@@ -15,30 +16,44 @@ def get_auth_headers():
 
 
 def extract_auth_from_request():
-    """Extract login and api_key from various sources in the request"""
+    """
+    Extract login and api_key from multiple possible sources:
+    1. HTTP Basic Authorization header
+    2. Query string parameters (?login=...&api_key=...)
+    3. Form data (POST body)
+    4. JSON body
+    """
     login = None
     api_key = None
 
-    # Try to get from JSON body
-    d_format = request.args.get("format", None)
-    data = request.get_data()
-    if data and d_format == "json":
-        json_data = request.get_json()
-        login = json_data.get("login", None)
-        api_key = json_data.get("api_key", None)
+    # 1. Authorization header (Basic Auth)
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Basic "):
+        try:
+            encoded_credentials = auth_header.split(" ", 1)[1].strip()
+            decoded = base64.b64decode(encoded_credentials).decode("utf-8")
+            if ":" in decoded:
+                login, api_key = decoded.split(":", 1)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            pass
 
-    # Try to get from Authorization header
-    elif "Authorization" in request.headers:
-        auth = request.headers["Authorization"]
-        if auth.startswith("Basic "):
-            auth = auth.split(" ")[1]
-            auth = base64.b64decode(auth).decode("utf-8")
-            login, api_key = auth.split(":")
-            print(login, api_key)
-
-    # Try to get from query parameters
+    # 2. Query parameters
     if not login or not api_key:
-        login = request.args.get("login", None)
-        api_key = request.args.get("api_key", None)
+        if "login" in request.args and "api_key" in request.args:
+            login = request.args.get("login")
+            api_key = request.args.get("api_key")
+
+    # 3. Form data
+    if not login or not api_key:
+        if request.form:
+            login = request.form.get("login", login)
+            api_key = request.form.get("api_key", api_key)
+
+    # 4. JSON payload
+    if not login or not api_key:
+        json_data = request.get_json(silent=True)
+        if isinstance(json_data, dict):
+            login = json_data.get("login", login)
+            api_key = json_data.get("api_key", api_key)
 
     return login, api_key

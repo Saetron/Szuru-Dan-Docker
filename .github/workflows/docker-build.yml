@@ -18,6 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies and run tests
+        run: |
+          pip install -r requirements.txt
+          pytest
+
       - name: Set up Git identity
         run: |
           git config --global user.name "github-actions[bot]"

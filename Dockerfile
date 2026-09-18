@@ -1,16 +1,16 @@
-# Use an official Python runtime as a parent image
+# Use an official lightweight Python runtime
 FROM python:3.11-slim
 
-# Set environment variables to prevent Python from writing pyc files and buffering stdout/stderr
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=9000
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Install git in case dependencies or setup require it
+# Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency list first to leverage Docker layer caching
@@ -19,11 +19,15 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code into the container
+# Copy application files
 COPY . .
 
-# Expose port 9000 (default port specified in config)
+# Expose default port
 EXPOSE 9000
 
-# Command to run the Flask application
-CMD ["python", "app.py"]
+# Container healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:9000/health || exit 1
+
+# Run with Gunicorn production WSGI server
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "--threads", "4", "-b", "0.0.0.0:9000", "app:create_app()"]

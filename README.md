@@ -1,6 +1,18 @@
 # Szuru-Dan Docker
 
-A Flask-based API translation proxy that maps Szurubooru API endpoints into Danbooru-style responses, allowing third-party Danbooru mobile and desktop clients to connect directly to your Szurubooru server.
+[![License: EUPL 1.2](https://img.shields.io/badge/License-EUPL%201.2-blue.svg)](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12)
+
+A production-ready API translation proxy that maps Szurubooru API endpoints into Danbooru-style responses, allowing third-party Danbooru mobile and desktop clients to connect directly to your Szurubooru server.
+
+---
+
+## Features
+
+- **Danbooru Compatibility**: Maps Danbooru requests to Szurubooru queries including ratings (`rating:s/q/e`), sort orders (`order:score`, `order:favcount`, `order:id`), and tags.
+- **Client Support**: Validated with [AnimeBoxes](https://www.animebox.es/) (iOS), [Boorusama](https://github.com/khoadng/Boorusama) (Android/Desktop), and [BooruHub / Flexbooru](https://github.com/flexbooru/flexbooru) (Android).
+- **Reverse Proxy Media Streaming**: Built-in HTTP range request proxying for fast image loading and video streaming.
+- **12-Factor Configuration**: Configure via environment variables or `config.ini`.
+- **Production WSGI Server**: Powered by Gunicorn with connection pooling.
 
 ---
 
@@ -18,10 +30,12 @@ services:
     container_name: szuru-dan
     ports:
       - "9000:9000"
-    volumes:
-      - ./config.ini:/app/config.ini:ro
+    environment:
+      - SZURUBOORU_URL=http://127.0.0.1:8080/
+      - REVERSE_PROXY_MODE=false
+      - PORT=9000
     restart: unless-stopped
-  ```
+```
 
 Start the container:
 
@@ -35,58 +49,83 @@ docker compose up -d
 docker run -d \
   --name szuru-dan \
   -p 9000:9000 \
-  -v $(pwd)/config.ini:/app/config.ini:ro \
+  -e SZURUBOORU_URL=http://127.0.0.1:8080/ \
+  -e REVERSE_PROXY_MODE=false \
   ghcr.io/saetron/szuru-dan-docker:latest
 ```
 
 ### Option 2: Local Installation
+
 #### 1. Clone the repository
 ```bash
 git clone https://github.com/Saetron/Szuru-Dan-Docker.git
 cd Szuru-Dan-Docker
 ```
+
 #### 2. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
+
 #### 3. Run the server
 ```bash
 python app.py
+# Or with Gunicorn:
+gunicorn -w 2 -k gthread --threads 4 -b 0.0.0.0:9000 "app:create_app()"
 ```
 
+---
+
 ## Configuration
-Copy or rename `config_.ini` to `config.ini` in the root directory:
-```toml
+
+You can configure Szuru-Dan using **Environment Variables** (recommended for Docker) or a `config.ini` file:
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `SZURUBOORU_URL` | `http://127.0.0.1:8080/` | Base URL of your Szurubooru instance |
+| `PORT` | `9000` | Port on which Szuru-Dan listens |
+| `REVERSE_PROXY_MODE` | `false` | When true, image/thumbnail URLs point to this proxy server |
+| `DOMAIN_URL` | `""` | Custom public domain URL if not using reverse proxy mode |
+| `ENABLE_TIMING_LOGS` | `false` | Logs performance timing metrics for debugging |
+| `DEBUG` | `false` | Enable Flask debug mode (development only) |
+
+### INI File (`config.ini`)
+Copy `config_.ini` to `config.ini`:
+```ini
 [API]
-# The base URL of your Szurubooru server API instance
 backend_url = http://127.0.0.1:8080/
-
-# Port on which this API translator runs
 port = 9000
-
-# Enable reverse proxy mode
-# Rewrites image URLs to point to this proxy server
 reverse_proxy_mode = false
-
-# Enable performance timing logs (for debugging)
 enable_timing_logs = false
 ```
 
-## Supported API
-- `/posts.json`
-- `/posts/{id}.json`
-- `/favorites.json`
-- `/favorites/{id}.json`
-- `/post_votes.json`
-- `/users/{id}.json`
-- `/profile.json`
-- `/tags/autocomplete.json`
+---
+
+## Supported Endpoints
+
+- `/health` - Health check endpoint
+- `/posts.json` & `/posts` - Post search with pagination and tag filtering
+- `/posts/{id}.json` - Single post details
+- `/counts/posts.json` - Post counts matching tag queries
+- `/favorites.json` & `/post_votes.json` - View, add (`POST`), and remove (`DELETE`) user favorites
+- `/tags.json` - Tag list and search
+- `/tags/autocomplete.json` & `/autocomplete.json` - Fast tag autocompletion
+- `/users/{id}.json` & `/users.json` - User profile queries
+- `/profile.json` - Current user profile
+- `/data/<path>`, `/thumbnails/<path>`, `/avatars/<path>` - Media proxying with HTTP byte-range streaming
+
+---
 
 ## Tested Clients
 
-Android:
-- [BooruHub(Flexbooru)](https://github.com/flexbooru/flexbooru)
-- [Boorusama](https://github.com/khoadng/Boorusama)
+- **iOS**: [AnimeBoxes](https://www.animebox.es/)
+- **Android / Desktop**: [Boorusama](https://github.com/khoadng/Boorusama)
+- **Android**: [BooruHub (Flexbooru)](https://github.com/flexbooru/flexbooru)
 
-IOS:
-- [AnimeBoxes](https://www.animebox.es/) (Also validated with the docker version)
+---
+
+## License
+
+This project is licensed under the **European Union Public Licence v1.2** ([EUPL-1.2](LICENSE)).

@@ -4,6 +4,13 @@ services:
     container_name: szuru-dan
     ports:
       - "9000:9000"
-    volumes:
-      - ./config.ini:/app/config.ini:ro
+    environment:
+      # The base URL of your Szurubooru server instance
+      - SZURUBOORU_URL=http://127.0.0.1:8080/
+      # Enable reverse proxy mode (rewrites image URLs to point to this proxy)
+      - REVERSE_PROXY_MODE=false
+      - PORT=9000
+    # Alternatively, you can mount a config.ini file:
+    # volumes:
+    #   - ./config.ini:/app/config.ini:ro
     restart: unless-stopped
