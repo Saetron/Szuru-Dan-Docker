@@ -9,28 +9,50 @@ logger = logging.getLogger(__name__)
 users_bp = Blueprint("users", __name__)
 
 
-@users_bp.route("/users/<int:user_id>.json", methods=["GET"])
-@users_bp.route("/users/<int:user_id>", methods=["GET"])
-def get_user(user_id):
+@users_bp.route("/users/<user_identifier>.json", methods=["GET"])
+@users_bp.route("/users/<user_identifier>", methods=["GET"])
+def get_user(user_identifier):
     headers, login, _ = get_auth_headers()
-    target_user = login or str(user_id)
+    target_user = user_identifier
+    if target_user.isdigit() and login:
+        target_user = login
 
     try:
+        # First try direct /user/<name>
         response = requests.get(
+            f"{config.SZURUBOORU_API_URL}/user/{target_user}",
+            headers=headers,
+            timeout=10,
+        )
+        if response.status_code == 200:
+            user_obj = response.json()
+            profile = convert_user_format(user_obj)
+            if user_identifier.isdigit():
+                profile["id"] = int(user_identifier)
+            return jsonify(profile), 200
+
+        # Fallback to /users?query=<name>
+        fallback_resp = requests.get(
             f"{config.SZURUBOORU_API_URL}/users",
             params={"query": target_user},
             headers=headers,
             timeout=10,
         )
-        if response.status_code == 200:
-            user_profile = response.json()
-            profile = convert_user_format(user_profile)
-            profile["id"] = user_id
-            return jsonify(profile), 200
-        else:
-            return jsonify({"message": "Profile not found"}), response.status_code
+        if fallback_resp.status_code == 200:
+            data = fallback_resp.json()
+            results = data.get("results", [])
+            if results:
+                profile = convert_user_format(results[0])
+                if user_identifier.isdigit():
+                    profile["id"] = int(user_identifier)
+                return jsonify(profile), 200
+
+        if response.status_code in (401, 403):
+            return jsonify({"message": "Access denied"}), response.status_code
+
+        return jsonify({"message": "Profile not found"}), 404
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching user {user_id}: {e}")
+        logger.error(f"Error fetching user {user_identifier}: {e}")
         return jsonify(convert_user_format({})), 200
 
 
@@ -74,18 +96,36 @@ def get_profile():
         return jsonify(convert_user_format({})), 200
 
     try:
+        # Try direct user endpoint first
         response = requests.get(
+            f"{config.SZURUBOORU_API_URL}/user/{login}",
+            headers=headers,
+            timeout=10,
+        )
+        if response.status_code == 200:
+            user_obj = response.json()
+            return jsonify(convert_user_format(user_obj)), 200
+
+        # Fallback to searching users
+        fallback_resp = requests.get(
             f"{config.SZURUBOORU_API_URL}/users",
             params={"query": login},
             headers=headers,
             timeout=10,
         )
-        if response.status_code == 200:
-            user_profile = response.json()
-            profile = convert_user_format(user_profile)
-            return jsonify(profile), 200
-        else:
-            return jsonify(convert_user_format({})), 200
+        if fallback_resp.status_code == 200:
+            user_profile = fallback_resp.json()
+            results = user_profile.get("results", [])
+            if results:
+                return jsonify(convert_user_format(results[0])), 200
+
+        if response.status_code in (401, 403):
+            return (
+                jsonify({"message": "Invalid username or password", "success": False}),
+                response.status_code,
+            )
+
+        return jsonify(convert_user_format({})), 200
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching profile: {e}")
         return jsonify(convert_user_format({})), 200

@@ -18,11 +18,22 @@ category_map = {
     5: "Meta",
 }
 
+RANK_MAP = {
+    "anonymous": (0, "Anonymous"),
+    "restricted": (10, "Restricted"),
+    "regular": (20, "Member"),
+    "power": (30, "Gold"),
+    "moderator": (40, "Moderator"),
+    "administrator": (50, "Admin"),
+}
+
 
 def is_post_favorited_by(szuru_post: Dict[str, Any], login: Optional[str]) -> bool:
     """Check if the current post is favorited by the logged-in user"""
     if not login:
         return False
+    if szuru_post.get("ownFavorite") is True:
+        return True
     favorited_by = szuru_post.get("favoritedBy", [])
     login_lower = login.lower()
     for fav in favorited_by:
@@ -48,18 +59,21 @@ def convert_user_format(user_data: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "id": 1,
             "name": "Anonymous",
-            "level": 20,
-            "level_string": "Member",
+            "level": 0,
+            "level_string": "Anonymous",
             "created_at": "2020-01-01T00:00:00Z",
             "is_deleted": False,
             "is_banned": False,
         }
 
+    rank = str(user_obj.get("rank", "regular")).lower()
+    level, level_string = RANK_MAP.get(rank, (20, "Member"))
+
     return {
         "id": user_obj.get("id", 1),
         "name": user_obj.get("name", "User"),
-        "level": 20,
-        "level_string": user_obj.get("rank", "Member"),
+        "level": level,
+        "level_string": level_string,
         "created_at": user_obj.get("creationTime", ""),
         "last_logged_in_at": user_obj.get("lastLoginTime", ""),
         "updated_at": user_obj.get("lastLoginTime", "")
@@ -70,6 +84,10 @@ def convert_user_format(user_data: Dict[str, Any]) -> Dict[str, Any]:
         "is_banned": False,
         "time_zone": "Eastern Time (US & Canada)",
         "post_upload_count": user_obj.get("uploadedPostCount", 0),
+        "favorite_count": user_obj.get("favoritePostCount", 0),
+        "comment_count": user_obj.get("commentCount", 0),
+        "per_page": 20,
+        "default_image_size": "large",
     }
 
 

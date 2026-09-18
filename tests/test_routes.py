@@ -65,3 +65,28 @@ def test_auth_extraction_with_colon_in_password(app):
         login, api_key = extract_auth_from_request()
         assert login == "myuser"
         assert api_key == "pass:word:123"
+
+
+@patch("routes.users.requests.get")
+def test_profile_authenticated(mock_get, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "name": "testuser",
+        "rank": "administrator",
+        "creationTime": "2023-01-01T00:00:00Z",
+        "lastLoginTime": "2023-01-02T00:00:00Z",
+        "uploadedPostCount": 10,
+        "favoritePostCount": 5,
+        "commentCount": 2,
+    }
+    mock_get.return_value = mock_response
+
+    response = client.get("/profile.json?login=testuser&api_key=secretpass")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["name"] == "testuser"
+    assert data["level"] == 50
+    assert data["level_string"] == "Admin"
+    assert data["post_upload_count"] == 10
+    assert data["favorite_count"] == 5
